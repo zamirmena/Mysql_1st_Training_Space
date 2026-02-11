@@ -499,7 +499,7 @@ CREATE TABLE Rendimientos (
 );
 
 
-SELECT 
+SELECT  -- #Rendimiento total por inversión
 	ins.Inversion_ID,
     ins.Monto_inicial, 
     SUM(r.Monto) AS Rendimientos,
@@ -509,7 +509,7 @@ LEFT JOIN inversiones AS ins
 	ON r.Inversion_ID = ins.Inversion_ID
 GROUP BY ins.Inversion_ID;
 
-SELECT
+SELECT -- #- Ranking de inversiones más rentables.
 	ins.Tipo,
     SUM(ins.Monto_inicial) AS Inversion_Incial,
     SUM(r.Monto) as RENT,
@@ -524,6 +524,7 @@ LEFT JOIN inversionistas AS it
 	ON ins.Inversion_ID = it.Inversionista_ID
 GROUP BY ins.Tipo
 ORDER BY (((SUM(ins.Monto_inicial) + SUM(r.Monto))/SUM(ins.Monto_inicial))-1)*100 DESC;
+
 
 
 
