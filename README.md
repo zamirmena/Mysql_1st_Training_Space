@@ -526,6 +526,282 @@ GROUP BY ins.Tipo
 ORDER BY (((SUM(ins.Monto_inicial) + SUM(r.Monto))/SUM(ins.Monto_inicial))-1)*100 DESC;
 
 
+## Select Data _ Curso de JOINS
+
+CREATE DATABASE VentasJoins;
+USE VentasJoins;
+-- Tabla de Clientes
+CREATE TABLE Clientes (
+    ClienteID INT AUTO_INCREMENT PRIMARY KEY,
+    Nombre    VARCHAR(100) NOT NULL,
+    Email     VARCHAR(150) NOT NULL UNIQUE
+);
+-- Tabla de Productos
+CREATE TABLE Productos (
+    ProductoID INT AUTO_INCREMENT PRIMARY KEY,
+    NombreProd VARCHAR(100) NOT NULL,
+    Categoria  VARCHAR(50)  NOT NULL,
+    Precio     DECIMAL(10,2) NOT NULL
+);
+-- Tabla de Tiendas
+CREATE TABLE Tiendas (
+    TiendaID INT AUTO_INCREMENT PRIMARY KEY,
+    NombreTienda VARCHAR(100) NOT NULL,
+    Ciudad       VARCHAR(100) NOT NULL
+);
+-- Tabla de Ventas (relación muchos a muchos entre Clientes y Productos, con Tienda)
+CREATE TABLE Ventas (
+    VentaID     INT AUTO_INCREMENT PRIMARY KEY,
+    ClienteID   INT NOT NULL,
+    ProductoID  INT NOT NULL,
+    TiendaID    INT NOT NULL,
+    FechaVenta  DATE NOT NULL,
+    Cantidad    INT  NOT NULL,
+    PrecioUnit  DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (ClienteID) REFERENCES Clientes(ClienteID),
+    FOREIGN KEY (ProductoID) REFERENCES Productos(ProductoID),
+    FOREIGN KEY (TiendaID) REFERENCES Tiendas(TiendaID)
+);
+SELECT * FROM Productos;
+SELECT * FROM Ventas;
+SELECT * FROM Tiendas;
+SELECT * FROM Clientes;
+
+
+-- INNER JOIN
+SELECT 
+	v.VentaID, 
+    v.ProductoID, 
+    v.TiendaID, 
+    v.FechaVenta, 
+    (ROUND((v.Cantidad)*(v.PrecioUnit),2)) AS Importe,
+    c.ClienteID,
+    c.Nombre,
+    c.Email
+FROM
+ventasjoins.Ventas AS v
+INNER JOIN Clientes AS c ON v.ClienteID = c.ClienteID;
+
+SELECT -- Muestra todas las ventas realizadas incluyendo el nombre del cliente que las hizo.
+	v.VentaID, 
+    v.ProductoID, 
+    v.TiendaID, 
+    v.FechaVenta, 
+    (ROUND((v.Cantidad)*(v.PrecioUnit),2)) AS Importe,
+    c.ClienteID,
+    c.Nombre,
+    c.Email
+FROM
+ventasjoins.Ventas AS v
+INNER JOIN Clientes AS c ON v.ClienteID = c.ClienteID;
+
+-- Obtén la lista de todos los clientes y muestra también la información de sus compras, si las tienen. Identifica qué clientes aparecen sin compras.
+
+SELECT 
+    c.ClienteID,
+    c.Nombre,
+    p.NombreProd,
+    p.Categoria,
+    t.NombreTienda,
+    t.`Ciudad`,
+    (ROUND((v.Cantidad)*(v.PrecioUnit),2)) AS Importe
+FROM clientes AS c
+INNER JOIN ventas AS v ON c.`ClienteID` =v.`ClienteID`
+INNER JOIN productos AS p ON v.`ProductoID`=p.`ProductoID`
+INNER JOIN tiendas AS t ON t.`TiendaID`=v.`TiendaID`;
+
+SELECT 
+    c.Nombre,
+    SUM(ROUND((v.Cantidad)*(v.PrecioUnit),2)) AS Comprado,
+    COUNT((p.Categoria)) AS Total_Comprado,
+    ROUND(AVG((v.Cantidad)*(v.PrecioUnit)),2) AS Promedio_Compra
+FROM clientes AS c
+INNER JOIN ventas AS v ON c.`ClienteID` =v.`ClienteID`
+INNER JOIN productos AS p ON v.`ProductoID`=p.`ProductoID`
+INNER JOIN tiendas AS t ON t.`TiendaID`=v.`TiendaID`
+GROUP BY c.ClienteID
+ORDER BY Comprado DESC;
+
+-- Muestra todos los productos junto con las ventas en las que participaron. ¿Qué producto aparece sin ventas?
+
+SELECT 
+    p.`NombreProd`,
+    v.FechaVenta,
+    v.Cantidad,
+    c.Nombre,
+    t.NombreTienda AS Tienda
+FROM
+productos p
+LEFT JOIN Ventas v 
+    ON p.`ProductoID`=v.`ProductoID`
+INNER JOIN Clientes c
+    ON v.`ClienteID`=c.`ClienteID`
+INNER JOIN Tiendas t
+    ON v.`TiendaID`=t.`TiendaID`
+ORDER BY v.`FechaVenta` ASC; 
+
+
+
+-- 1) Limpiar datos en orden correcto (hija -> padres)
+DELETE FROM Ventas;
+DELETE FROM Productos;
+DELETE FROM Clientes;
+DELETE FROM Tiendas;
+
+-- 2) Reiniciar AUTO_INCREMENT (equivalente a reseed)
+ALTER TABLE Ventas AUTO_INCREMENT = 1;
+ALTER TABLE Clientes AUTO_INCREMENT = 1;
+ALTER TABLE Productos AUTO_INCREMENT = 1;
+ALTER TABLE Tiendas AUTO_INCREMENT = 1;
+
+-- 3) Insertar datos que DEJEN HUECOS para que el LEFT JOIN muestre NULL
+
+-- Clientes: 2 con compras, 2 sin compras
+INSERT INTO Clientes (Nombre, Email) VALUES
+('Ana Pérez', 'ana@example.com'),      -- con compras
+('Luis Gómez', 'luis@example.com'),    -- con compras
+('María Torres', 'maria@example.com'), -- SIN compras
+('Carlos Díaz', 'carlos@example.com'); -- SIN compras
+
+-- Productos: 3 vendidos, 1 NUNCA vendido (Teclado)
+INSERT INTO Productos (NombreProd, Categoria, Precio) VALUES
+('Laptop Lenovo',   'Electrónica', 2500),   -- vendido
+('Mouse Logitech',  'Accesorios',   50),    -- vendido
+('Teclado MS',      'Accesorios',   80),    -- NUNCA vendido
+('Monitor Samsung', 'Electrónica', 1200);   -- vendido
+
+-- Tiendas: 2 con ventas, 1 SIN ventas (Sur)
+INSERT INTO Tiendas (NombreTienda, Ciudad) VALUES
+('SelectData Centro', 'Bogotá'),   -- con ventas
+('SelectData Norte',  'Medellín'), -- con ventas
+('SelectData Sur',    'Cali');     -- SIN ventas
+
+-- Ventas (solo para Ana y Luis; María/Carlos quedan sin compras)
+INSERT INTO Ventas (ClienteID, ProductoID, TiendaID, FechaVenta, Cantidad, PrecioUnit) VALUES
+(1, 1, 1, '2024-01-10', 1, 2500), -- Ana compra laptop en Bogotá
+(2, 2, 2, '2024-01-15', 2,   50), -- Luis compra mouse en Medellín
+(1, 4, 2, '2024-02-05', 1, 1200); -- Ana compra monitor en Medellín
+
+
+SELECT * FROM Productos;
+SELECT * FROM Ventas;
+SELECT * FROM Tiendas;
+SELECT * FROM Clientes;
+
+SELECT
+    c.Nombre,
+    SUM(ROUND((v.Cantidad)*(v.PrecioUnit),2)) AS Comprado,
+    COUNT((v.FechaVenta)) AS Total_Comprado,
+    ROUND(AVG((v.Cantidad)*(v.PrecioUnit)),2) AS Promedio_Compra
+FROM clientes c
+LEFT JOIN ventas v ON c.`ClienteID`=v.`ClienteID`
+GROUP BY c.`Nombre`;
+
+-- Muestra todos los productos junto con las ventas en las que participaron. ¿Qué producto aparece sin ventas?
+SELECT 
+    p.`NombreProd`,
+    p.`Categoria`,
+    COUNT(v.`VentaID`) AS Total_Comprado,
+    SUM(ROUND((v.Cantidad)*(v.PrecioUnit),2)) AS Comprado
+FROM productos p
+LEFT JOIN ventas v ON p.`ProductoID`=v.`ProductoID`
+GROUP BY p.`NombreProd`, p.`Categoria`
+ORDER BY Comprado DESC;
+
+ 
+--Haz una consulta que devuelva todos los clientes y todas las ventas, incluso si no tienen relación entre sí. ¿Dónde aparecen los valores nulos?
+SELECT 
+    c.ClienteID,
+    c.Nombre,
+    v.VentaID,
+    v.FechaVenta,
+    v.Cantidad,
+    v.PrecioUnit
+FROM clientes AS c
+LEFT JOIN ventas AS v 
+    ON c.ClienteID = v.ClienteID
+
+UNION
+
+-- Ventas con o sin clientes
+SELECT 
+    c.ClienteID,
+    c.Nombre,
+    v.VentaID,
+    v.FechaVenta,
+    v.Cantidad,
+    v.PrecioUnit
+FROM clientes AS c
+RIGHT JOIN ventas AS v 
+    ON c.ClienteID = v.ClienteID
+
+ORDER BY ClienteID, VentaID;
+
+--Realiza un reporte completo que muestre: cliente, producto, tienda, cantidad y fecha de cada venta.
+
+SELECT 
+    c.Nombre,
+    p.NombreProd,
+    p.Categoria,
+    t.NombreTienda,
+    t.Ciudad,
+    v.FechaVenta,
+    v.Cantidad,
+    v.PrecioUnit,
+    ROUND((v.Cantidad)*(v.PrecioUnit),2) AS Comprado
+
+FROM ventas AS v
+LEFT JOIN clientes AS c ON v.`ClienteID`=c.`ClienteID`
+LEFT JOIN productos AS p ON v.`ProductoID`=p.`ProductoID`
+LEFT JOIN tiendas AS t ON v.`TiendaID`=t.`TiendaID`;
+
+
+-- Encuentra a los clientes que nunca han realizado compras.
+
+SELECT
+    c.Nombre
+FROM clientes AS c
+LEFT JOIN ventas AS v ON c.`ClienteID`=v.`ClienteID`
+WHERE v.`VentaID` IS NULL;
+
+
+
+--Encuentra los productos que nunca se han vendido.
+SELECT
+    p.NombreProd
+FROM productos AS p
+LEFT JOIN ventas AS v ON p.`ProductoID`=v.`ProductoID`
+WHERE v.`VentaID` IS NULL;
+
+-- Muestra todas las tiendas con sus ventas. Identifica qué tienda aparece sin ventas.
+SELECT
+    t.`NombreTienda`,
+    t.`Ciudad`,
+    v.FechaVenta,
+    v.Cantidad,
+    ROUND((v.Cantidad)*(v.PrecioUnit),2) AS Comprado
+
+FROM tiendas AS t
+LEFT JOIN ventas AS v ON t.`TiendaID`=v.`TiendaID`;
+
+-- Construye una consulta que muestre para cada cliente su última compra (pista: deberás combinar JOIN con funciones de agrupación o subconsultas).
+SELECT
+    c.`Nombre`,
+    c.`Email`,
+    v.`Cantidad`,
+    v.`FechaVenta`,
+    ROUND((v.Cantidad)*(v.PrecioUnit),2) AS Comprado
+
+FROM clientes as c
+INNER JOIN ventas AS v 
+    ON c.`ClienteID`=v.`ClienteID`
+WHERE v.`FechaVenta` = (
+    SELECT MAX(v2.`FechaVenta`)
+    FROM ventas AS v2
+    WHERE v2.`ClienteID` =c.`ClienteID`
+);
+
+
 
 
 
