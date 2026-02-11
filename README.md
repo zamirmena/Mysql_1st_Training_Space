@@ -803,5 +803,121 @@ WHERE v.`FechaVenta` = (
 
 
 
+## SELECT DATA CURSO DE UNIONS Y SUBCONSULTAS
+
+CREATE TABLE Clientes_Online (
+    ClienteID INT PRIMARY KEY,
+    Nombre VARCHAR(100),
+    Ciudad VARCHAR(100)
+);
+
+CREATE TABLE Clientes_Tienda (
+    ClienteID INT PRIMARY KEY,
+    Nombre VARCHAR(100),
+    Ciudad VARCHAR(100)
+);
+
+-- Insertamos registros
+INSERT INTO Clientes_Online (ClienteID, Nombre, Ciudad) VALUES
+(1, 'Ana Pérez', 'Bogotá'),
+(2, 'Luis Gómez', 'Medellín'),
+(3, 'María Torres', 'Bogotá');
+
+INSERT INTO Clientes_Tienda (ClienteID, Nombre, Ciudad) VALUES
+(2, 'Luis Gómez', 'Medellín'),   -- Duplicado con Online
+(3, 'María Torres', 'Bogotá'),   -- Duplicado con Online
+(4, 'Carlos Díaz', 'Cali');
+
+
+SELECT COUNT(*) C
+FROM (
+	SELECT * FROM Clientes_Online
+	UNION ALL
+	SELECT * FROM Clientes_Tienda
+) AS C;
+
+
+
+
+SELECT * FROM Productos;
+SELECT * FROM Ventas;
+SELECT * FROM Tiendas;
+SELECT * FROM Clientes;
+
+-- SUBCONSULTA total gastado por clientes
+SELECT
+    c.`Nombre`,
+    (SELECT
+        SUM(v.`Cantidad`*v.`PrecioUnit`)
+    FROM ventas AS v
+    WHERE v.`ClienteID`=c.`ClienteID`) AS Comprado
+FROM clientes AS c
+HAVING Comprado IS NOT NULL;
+
+
+-- SUBCONSULTA clientes que no compraron "La subconsulta está dentro del WHERE"
+SELECT 
+    c.Nombre
+FROM clientes as c 
+WHERE c.`ClienteID` NOT IN (SELECT v.`ClienteID` FROM ventas AS v );
+
+
+-- Obtén el producto más caro vendido usando una subconsulta dentro de la cláusula WHERE.
+
+SELECT
+    p.`NombreProd`,
+    p.`Categoria`,
+    (SELECT 
+        MAX(v.`PrecioUnit`)    
+    FROM ventas AS v
+    WHERE v.`ProductoID`= p.`ProductoID`) AS Valor_Maximo
+FROM productos AS p
+ORDER BY Valor_Maximo DESC
+LIMIT 1;
+
+
+--Lista el nombre y correo de los clientes cuya compra total supere el gasto promedio de todos los clientes.
+
+SELECT
+    c.`Nombre`,
+    c.`Email`,
+    (SUM(V.`Cantidad`*V.`PrecioUnit`)) AS Compra_Total,
+    (SELECT
+         AVG(V.`Cantidad`*V.`PrecioUnit`)
+    FROM ventas AS V
+    ) AS Promedio
+FROM clientes AS c
+LEFT JOIN ventas as V ON c.`ClienteID`=V.`ClienteID`
+GROUP BY 2;c.`Nombre`, c.Email
+HAVING Compra_Total > Promedio;
+
+
+--Encuentra el nombre de los productos cuya cantidad total vendida sea mayor que la cantidad promedio de todos los productos.
+SELECT
+    p.`NombreProd`,
+    SUM(v.`Cantidad`) AS Total_Vendido,
+    (SELECT 
+        AVG(v.`Cantidad`)
+    FROM ventas AS v           
+    ) AS Promedio_Vendido
+
+FROM productos AS p
+LEFT JOIN ventas AS v ON p.`ProductoID`=v.`ProductoID`
+GROUP BY p.`NombreProd`
+HAVING Total_Vendido > Promedio_Vendido;
+
+--Muestra las ventas realizadas en la misma fecha que la primera venta registrada.
+SELECT
+    *
+FROM ventas v
+WHERE v.`FechaVenta` = (SELECT MIN(v.`FechaVenta`) FROM ventas as v);
+
+
+
+-- Lista las tiendas que no han tenido ninguna venta usando una subconsulta.
+SELECT 
+    t.NombreTienda
+FROM tiendas AS t
+WHERE t.`TiendaID` NOT IN (SELECT v.`TiendaID` FROM ventas AS v );
 
 
