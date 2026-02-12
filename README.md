@@ -921,3 +921,37 @@ FROM tiendas AS t
 WHERE t.`TiendaID` NOT IN (SELECT v.`TiendaID` FROM ventas AS v );
 
 
+--Muestra el cliente con la mayor cantidad de compras (más número de ventas realizadas).
+SELECT
+    c.`Nombre`,
+    (SELECT 
+        COUNT(v.`Cantidad`)
+    FROM ventas as v
+    WHERE v.`ClienteID`=c.`ClienteID`) AS Max_Cantidad
+FROM clientes AS c
+LEFT JOIN ventas AS v ON c.`ClienteID`=v.`ClienteID`
+ORDER BY Max_Cantidad DESC
+LIMIT 1;
+
+
+-- Obtén los productos nunca vendidos utilizando una subconsulta.
+SELECT 
+    p.NombreProd
+FROM productos as p 
+WHERE p.`ProductoID` NOT IN (SELECT v.`ProductoID` FROM ventas AS v );
+
+
+-- Lista las ventas cuyo importe total (Cantidad × PrecioUnit) sea mayor que el importe promedio de todas las ventas.
+SELECT
+    c.`Nombre`,
+    (SUM(v.`Cantidad`*v.`PrecioUnit`)) AS Importe, 
+    (SELECT 
+        AVG(v.`Cantidad`*v.`PrecioUnit`)
+    FROM ventas AS v) AS Promedio_Total
+FROM clientes AS c
+LEFT JOIN ventas AS v ON v.`ClienteID`=c.`ClienteID`
+GROUP BY c.`Nombre`
+HAVING Importe > Promedio_Total;
+
+
+
