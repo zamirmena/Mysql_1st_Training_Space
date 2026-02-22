@@ -955,3 +955,149 @@ HAVING Importe > Promedio_Total;
 
 
 
+-- Proyecto SQL Básico Total Transacciones procesadas
+SELECT 
+	COUNT(*) AS Numero_Transacciones,
+    SUM(Amount) AS Total_Transaccionado
+FROM proyecto_sql_returns.transacciones;
+
+
+-- Proyecto SQL Básico Porcentaje de Transacciones y total retornado
+SELECT 
+	Trans_status, 
+	COUNT(*) AS Numero_Transacciones,
+    SUM(Amount) AS Total_Transaccionado,
+    (SELECT
+		SUM(Amount)
+    FROM proyecto_sql_returns.transacciones) AS Total,
+    round(
+		(SUM(Amount)/
+		(SELECT
+			SUM(Amount)
+		FROM proyecto_sql_returns.transacciones)*100),2) AS Weight,
+    AVG(days_to_settle) AS Average_Days
+FROM proyecto_sql_returns.transacciones
+GROUP BY Trans_status
+ORDER BY Total_Transaccionado DESC;
+
+
+-- Proyecto SQL Intermedio: DSO =SUM(Amount*days to settle)/ amount
+SELECT
+    c.customer_id,
+	round(SUM(t.amount*t.days_to_settle)/SUM(t.amount),2) AS DSO
+FROM proyecto_sql_returns.transacciones AS t
+LEFT JOIN proyecto_sql_returns.clientes AS c ON t.customer_id = c.customer_id
+WHERE t.Trans_status = 'SETTLED'
+GROUP BY c.customer_id
+ORDER BY DSO desc;
+
+-- Proyecto SQL Intermedio:PORCENTAJE DE RETORNOS POR INDUSTRIA
+SELECT
+	C.industry,
+    COUNT(t.customer_id) AS Total_Transacciones,
+    CONCAT(ROUND((COUNT(t.customer_id)/ 
+    (SELECT
+		COUNT(t.amount)
+    FROM proyecto_sql_returns.transacciones AS t))*100,2),'%') AS Total_Transacciones_retornadas, 
+    SUM(t.amount) AS  MONTO_RETORNADO,
+    CONCAT((ROUND ((SUM(t.amount)/
+    (SELECT
+		SUM(t.amount)
+    FROM proyecto_sql_returns.transacciones AS t))*100,2)), '%')AS Porcentaje_Monto_RETORNADO
+    
+FROM proyecto_sql_returns.clientes AS c 
+LEFT JOIN proyecto_sql_returns.transacciones AS t ON t.customer_id = c.customer_id
+WHERE t.Trans_status = 'RETURNED'
+GROUP BY C.industry
+ORDER BY Total_Transacciones DESC;
+
+
+
+
+
+-- Proyecto SQL Intermedio: Clientes con retorno y sus scores
+SELECT
+	C.customer_id,
+    COUNT(C.customer_id) AS Total_Transacciones,
+    CONCAT(ROUND((COUNT(C.customer_id)/ 
+    (SELECT
+		COUNT(t.amount)
+    FROM proyecto_sql_returns.transacciones AS t))*100,2),'%') AS Total_Transacciones_retornadas, 
+    SUM(t.amount) AS  MONTO_RETORNADO,
+    CONCAT((ROUND ((SUM(t.amount)/
+    (SELECT
+		SUM(t.amount)
+    FROM proyecto_sql_returns.transacciones AS t))*100,2)), '%')AS Porcentaje_Monto_RETORNADO
+    
+FROM proyecto_sql_returns.clientes AS c 
+LEFT JOIN proyecto_sql_returns.transacciones AS t ON t.customer_id = c.customer_id
+WHERE t.Trans_status = 'RETURNED'
+GROUP BY C.customer_id
+ORDER BY Total_Transacciones DESC;
+
+
+
+-- -- Proyecto SQL Intermedio: CREACIÓN DE VISTAS 
+CREATE VIEW proyecto_sql_reutrns.VW_DSO AS (
+SELECT
+	C.customer_id,
+    c.credit_score,
+    round(SUM(t.amount*t.days_to_settle)/SUM(t.amount),2) AS DSO,
+    t.Trans_status,
+	(CASE
+		WHEN credit_score < 600 THEN 'ALTO'
+		WHEN credit_score BETWEEN 600 AND 700 THEN 'MEDIO'
+		ELSE 'BAJO'
+	END) AS SCORE_VALUATION
+FROM proyecto_sql_returns.clientes AS c 
+LEFT JOIN proyecto_sql_returns.transacciones AS t ON t.customer_id = c.customer_id
+GROUP BY C.customer_id,  t.Trans_status
+ORDER BY DSO DESC
+);
+
+-- -- Proyecto SQL Intermedio: CREACIÓN DE PRODIMEINTO ALMACENADO
+DELIMITER $$
+CREATE PROCEDURE SP_CLIENTES_RANKEADOS_New (
+IN
+	Trans_Status VARCHAR(50)
+				)
+BEGIN
+		SELECT
+			C.customer_id,
+			COUNT(*) AS Total_Transacciones,
+			CONCAT(
+				ROUND(
+					(COUNT(t.transaction_id)*1.0/ 
+					(SELECT
+						COUNT(t.amount)
+					FROM proyecto_sql_returns.transacciones AS t))*100,2),'%') AS Total_Transacciones_retornadas, 
+			SUM(t.amount) AS  MONTO_RETORNADO,
+			CONCAT(
+				(ROUND ((SUM(t.amount)/
+						(SELECT
+							SUM(t.amount)
+						FROM proyecto_sql_returns.transacciones AS t))
+						*100,2)
+				), '%'
+			)AS Porcentaje_Monto_RETORNADO
+			
+		FROM proyecto_sql_returns.clientes AS c 
+		LEFT JOIN proyecto_sql_returns.transacciones AS t 
+			ON t.customer_id = c.customer_id
+		WHERE t.Trans_status = @Trans_Status
+		GROUP BY C.customer_id
+		ORDER BY Total_Transacciones DESC;
+END$$
+DELIMITER ;
+
+-- Proyecto SQL Intermedio:LLAMAR A UN PROCEDIMIENTO ALMACENADO
+call proyecto_sql_returns.SP_CLIENTES_RANKEADOS('SETTLEDfilm_in_stock');
+
+-- Proyecto SQL Intermedio: **Creación de Logins
+CREATE USER 'JuanUser'@'127.0.0.1:3306'
+IDENTIFIED BY "1234";
+
+GRANT ALL PRIVILEGES 
+ON
+proyecto_sql_returns.* TO 'JuanUser'@'127.0.0.1:3306';
+
