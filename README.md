@@ -1101,3 +1101,81 @@ GRANT ALL PRIVILEGES
 ON
 proyecto_sql_returns.* TO 'JuanUser'@'127.0.0.1:3306';
 
+
+
+-- Proyecto SQL: Nivel "Entrevistas" - Ranking de clientes (Window functions)
+
+SELECT 
+	c.customer_id,
+    RANK() 
+		OVER(ORDER BY SUM(t.amount) DESC) AS Ranking_Amount,
+	RANK()
+		OVER(ORDER BY c.credit_score DESC) AS Ranking_score,
+	RANK()
+		OVER(ORDER BY
+			round(
+            SUM(t.amount*t.days_to_settle)/
+            SUM(t.amount)
+				,2)
+			) AS RANKING_DSO
+FROM proyecto_sql_returns.transacciones AS t 
+LEFT JOIN proyecto_sql_returns.clientes AS c
+	ON t.customer_id = c.customer_id
+group by c.customer_id
+ORDER BY RANKING_DSO;
+
+-- Proyecto SQL: Nivel "Entrevistas" - cOHORTE POR FECHAS Y TAS DE RETORNO(Window functions)
+		SELECT
+			RANK()
+            OVER (
+            ORDER BY CONCAT(
+							(ROUND ((SUM(t.amount)/
+									(SELECT
+										SUM(t.amount)
+									FROM proyecto_sql_returns.transacciones AS t))
+									*100,2)
+							), '%'
+							) DESC
+				) AS RANKING,
+			YEAR(c.signup_date),
+			COUNT(*) AS Total_Transacciones,
+			CONCAT(
+				ROUND(
+					(COUNT(t.transaction_id)*1.0/ 
+					(SELECT
+						COUNT(t.amount)
+					FROM proyecto_sql_returns.transacciones AS t))*100,2),'%') AS Total_Transacciones_retornadas, 
+			SUM(t.amount) AS  MONTO_RETORNADO,
+			CONCAT(
+				(ROUND ((SUM(t.amount)/
+						(SELECT
+							SUM(t.amount)
+						FROM proyecto_sql_returns.transacciones AS t))
+						*100,2)
+				), '%'
+				)AS Porcentaje_Monto_RETORNADO
+			
+		FROM proyecto_sql_returns.clientes AS c 
+		LEFT JOIN proyecto_sql_returns.transacciones AS t 
+			ON t.customer_id = c.customer_id
+		WHERE t.Trans_status = "RETURNED"
+		GROUP BY YEAR(c.signup_date);
+ 
+ -- Proyecto SQL: Nivel "Entrevistas" - CLASIFICACIÓN DE RIESGO (Case)
+
+ SELECT
+    c.customer_id,
+	round(SUM(t.amount*t.days_to_settle)/SUM(t.amount),2) AS DSO,
+    c.credit_limit,
+    
+   CASE 
+	WHEN round(SUM(t.amount*t.days_to_settle)/SUM(t.amount),2) < 5 THEN 'BAJO'
+    WHEN round(SUM(t.amount*t.days_to_settle)/SUM(t.amount),2) BETWEEN 5 AND 15 THEN 'MEDIO'
+	ELSE 'ALTO'
+        		
+   END AS Nivel_Riesgo
+FROM proyecto_sql_returns.transacciones AS t
+LEFT JOIN proyecto_sql_returns.clientes AS c 
+	ON t.customer_id = c.customer_id
+GROUP BY c.customer_id;
+
