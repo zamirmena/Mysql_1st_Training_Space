@@ -1177,5 +1177,119 @@ ORDER BY RANKING_DSO;
 FROM proyecto_sql_returns.transacciones AS t
 LEFT JOIN proyecto_sql_returns.clientes AS c 
 	ON t.customer_id = c.customer_id
+
+-- ## Revenue Total
+SELECT 
+    SUM(amount) AS revenue_total
+FROM transacciones;
+
+
+-- ##Revenue Neto 
+SELECT 
+    SUM(CASE 
+            WHEN trans_status = 'SETTLED' THEN amount 
+            ELSE 0 
+        END) AS revenue_net
+FROM transacciones;
+
+-- ##% Retornos (Indicador de Salud)
+SELECT 
+    SUM(amount) AS revenue_total,
+    SUM(CASE 
+		WHEN trans_status = 'RETURNED' 
+			THEN amount 
+		ELSE 0 
+	END) AS returned_amount,
+    ROUND(
+        SUM(CASE WHEN trans_status = 'RETURNED' THEN amount ELSE 0 END)
+        / NULLIF(SUM(amount),0) * 100,
+        2
+    ) AS return_percentage
+FROM transacciones
 GROUP BY c.customer_id;
+
+
+-- DSO Ponderado es Mostrar todas las transacciones que se completaron por los días que se demoraron completandolas Completadas por mes
+
+SELECT 
+	mONTH(TRANSACTION_DATE),
+	SUM(t.amount * t.days_to_settle)/ifnull(sum(t.amount),0) as DSO_Ponderado
+
+FROM proyecto_sql_returns.transacciones AS t
+WHERE trans_status = "SETTLED"
+GROUP BY mONTH(TRANSACTION_DATE);
+
+
+-- Total dinero en Mora
+
+SELECT 
+	
+    SUM(T.AMOUNT) AS Pending_to_collect
+
+FROM proyecto_sql_returns.transacciones AS T
+WHERE trans_status = "RETURNED"; 
+
+
+-- Concentración del 20% de los clientes que más gastan
+
+WITH REVENUE_BY_CUSTOMER as (
+	SELECT 
+		c.customer_id,
+        c.industry,
+        SUM(t.amount) AS Revenue
+    
+    FROM proyecto_sql_returns.transacciones AS t
+    INNER JOIN proyecto_sql_returns.cLIENTES AS c
+		ON t.customer_id = c.customer_iD
+	WHERE Trans_status = "Settled"
+    GROUP BY c.customer_id, c.industry
+),
+RANKED AS (
+	SELECT *,
+		NTILE(5) OVER (ORDER BY revenue DESC) AS Quintle
+    FROM REVENUE_BY_CUSTOMER
+)
+SELECT 
+	c.industry,
+	SUM(REVENUE) AS TOP_QUANTLE_20
+FROM proyecto_sql_returns.transacciones AS t
+inner join proyecto_sql_returns.clientes AS c
+	ON t.customer_id = c.customer_iD
+cross join  RANKED
+group by c.industry;
+
+
+-- ## PROYECTO RIESGO
+
+-- #### DSO por clientes
+
+SELECT 
+	t.customer_id,
+	SUM(t.amount * t.days_to_settle)/ifnull(sum(t.amount),0) as DSO_Ponderado
+
+FROM proyecto_sql_returns.transacciones AS t
+GROUP BY t.customer_id;
+
+
+
+-- Podemos ver cuanto dinero tiene como returned agrupado por nivel de riesgo
+
+select 
+	(CASE
+			WHEN C.CREDIT_SCORE < 600 then "Bajo"
+			WHEN C.CREDIT_SCORE BETWEEN 600 AND 700 THEN "Medio"
+			ELSE "Alto"
+	END ) as Risk_Level,
+	
+    SUM(t.amount) As risk_amount
+	
+from proyecto_sql_returns.transacciones AS t
+inner join proyecto_sql_returns.clientes AS c
+	ON t.customer_id = c.customer_iD
+	
+WHERE trans_status = "RETURNED"
+group by RISK_LEVEl;
+
+
+
 
