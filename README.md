@@ -1,7 +1,7 @@
 # Mysql_1st_Training_Space
 En este repositorio estaré practicando SQL desde cero, no como profesor sino como un alumno que no sabe nada del tema... Quieres acompañarme?
 
-# Financial Forecasting Analysis with MySQL
+# 1. Financial Forecasting Analysis with MySQL
 
 Financial analysis project built using MySQL on a 10-year dataset.
 Focused on turning raw financial data into structured insights for business evaluation and decision-making.
